@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
+import 'package:pdf/pdf.dart';
+import '../utils/pdf_generator.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:printing/printing.dart';
 
+// Certifique-se de que os caminhos dos imports batem com as suas pastas
 import '../models/servico_tomado.dart';
+import '../models/cliente.dart';
+import '../models/prestador.dart';
 
 class OrcamentoScreen extends StatefulWidget {
   const OrcamentoScreen({super.key});
@@ -15,104 +18,160 @@ class OrcamentoScreen extends StatefulWidget {
 }
 
 class _OrcamentoScreenState extends State<OrcamentoScreen> {
+  bool _isLoading = true;
+  
+  // Listas de dados
   List<ServicoTomado> servicos = [];
   List<bool> selecionados = [];
+  List<Cliente> clientes = [];
+  
+  // Seleções do usuário
+  Cliente? clienteSelecionado;
+  Prestador? prestador;
 
   @override
   void initState() {
     super.initState();
-    _carregarServicos();
+    _carregarDados();
   }
 
-  void _carregarServicos() async {
-    var box = await Hive.openBox<ServicoTomado>('servicoTomadoBox');
-    setState(() {
-      servicos = box.values.toList();
-      selecionados = List.generate(servicos.length, (index) => false);
-    });
+  void _carregarDados() async {
+    try {
+      // 1. Abrindo as 3 caixas do banco de dados
+      // ATENÇÃO: Verifique se os nomes das caixas batem exatamente com as telas de cadastro!
+      var boxServicos = await Hive.openBox<ServicoTomado>('servicoBox');
+      var boxClientes = await Hive.openBox<Cliente>('clienteBox');
+      var boxPrestador = await Hive.openBox<Prestador>('prestadorBox');
+      
+      setState(() {
+        servicos = boxServicos.values.toList();
+        selecionados = List.generate(servicos.length, (index) => false);
+        clientes = boxClientes.values.toList();
+        
+        // Puxa o perfil do prestador (se houver algum cadastrado)
+        if (boxPrestador.isNotEmpty) {
+          prestador = boxPrestador.get('prestador') ?? boxPrestador.values.first;
+        }
+        
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint("Erro ao abrir banco: $e");
+      setState(() { _isLoading = false; });
+    }
   }
 
-  Future<void> _gerarPdf() async {
-    final pdf = pw.Document();
-    double total = 0;
+Future<void> _gerarPdf() async {
+    // Validações de Regras de Negócio
+    if (prestador == null) {
+      _mostrarErro("Cadastre o perfil do Prestador antes de gerar um orçamento.");
+      return;
+    }
+    if (clienteSelecionado == null) {
+      _mostrarErro("Selecione um Cliente para o orçamento.");
+      return;
+    }
+    if (!selecionados.contains(true)) {
+      _mostrarErro("Selecione pelo menos um serviço.");
+      return;
+    }
 
-    pdf.addPage(
-      pw.Page(
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text("Orçamento de Serviços",
-                  style: pw.TextStyle(
-                      fontSize: 24, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 20),
-              ...List.generate(servicos.length, (index) {
-                if (selecionados[index]) {
-                  total += servicos[index].valor;
-                  return pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                          "• ${servicos[index].nome}: R\$ ${servicos[index].valor.toStringAsFixed(2)}"),
-                      pw.SizedBox(height: 5),
-                    ],
-                  );
-                }
-                return pw.SizedBox();
-              }),
-              pw.Divider(),
-              pw.Text("Total: R\$ ${total.toStringAsFixed(2)}",
-                  style: pw.TextStyle(
-                      fontSize: 18, fontWeight: pw.FontWeight.bold)),
-            ],
-          );
-        },
-      ),
+    // Filtra apenas os serviços que o usuário marcou no Checkbox
+    List<ServicoTomado> servicosEscolhidos = [];
+    for (int i = 0; i < servicos.length; i++) {
+      if (selecionados[i]) {
+        servicosEscolhidos.add(servicos[i]);
+      }
+    }
+
+    // Chama o nosso utilitário para desenhar o PDF
+    final pdf = await PdfGenerator.gerarDocumento(
+      cliente: clienteSelecionado!,
+      prestador: prestador!,
+      servicos: servicosEscolhidos,
     );
 
-    final directory = await getApplicationDocumentsDirectory();
-    final file = File("${directory.path}/orcamento.pdf");
-    await file.writeAsBytes(await pdf.save());
-
-    _compartilharPdf(file);
+    // Abre a visualização universal com o botão nativo de compartilhamento
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name: 'Orcamento_${clienteSelecionado!.nome.replaceAll(" ", "_")}.pdf',
+    );
   }
-
-  void _compartilharPdf(File file) async {
-    final url = "https://wa.me/?text=Enviei o orçamento no PDF anexo.";
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erro ao abrir o WhatsApp.")),
-      );
-    }
+  void _mostrarErro(String mensagem) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(mensagem), backgroundColor: Colors.red),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Gerar Orçamento")),
-      body: servicos.isEmpty
-          ? Center(child: Text("Nenhum serviço cadastrado"))
-          : ListView.builder(
-              itemCount: servicos.length,
-              itemBuilder: (context, index) {
-                return CheckboxListTile(
-                  title: Text(servicos[index].nome),
-                  subtitle:
-                      Text("R\$ ${servicos[index].valor.toStringAsFixed(2)}"),
-                  value: selecionados[index],
-                  onChanged: (bool? value) {
-                    setState(() {
-                      selecionados[index] = value!;
-                    });
-                  },
-                );
-              },
+      appBar: AppBar(title: const Text("Gerar Orçamento")),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Dropdown para selecionar o Cliente
+                  const Text("Selecione o Cliente:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  clientes.isEmpty
+                      ? const Text("Nenhum cliente cadastrado. Cadastre um cliente primeiro.", style: TextStyle(color: Colors.red))
+                      : DropdownButtonFormField<Cliente>(
+                          decoration: const InputDecoration(border: OutlineInputBorder()),
+                          hint: const Text("Escolha um cliente"),
+                          value: clienteSelecionado,
+                          items: clientes.map((Cliente cliente) {
+                            return DropdownMenuItem<Cliente>(
+                              value: cliente,
+                              child: Text(cliente.nome),
+                            );
+                          }).toList(),
+                          onChanged: (Cliente? novoCliente) {
+                            setState(() {
+                              clienteSelecionado = novoCliente;
+                            });
+                          },
+                        ),
+                  
+                  const SizedBox(height: 24),
+                  const Text("Selecione os Serviços:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  
+                  // Lista de serviços
+                  Expanded(
+                    child: servicos.isEmpty
+                        ? const Center(child: Text("Nenhum serviço cadastrado."))
+                        : ListView.builder(
+                            itemCount: servicos.length,
+                            itemBuilder: (context, index) {
+                              return Card(
+                                child: CheckboxListTile(
+                                  title: Text(servicos[index].nome),
+                                  subtitle: Text("R\$ ${servicos[index].valor.toStringAsFixed(2)}"),
+                                  value: selecionados[index],
+                                  activeColor: Colors.blueAccent,
+                                  onChanged: (bool? value) {
+                                    setState(() {
+                                      selecionados[index] = value!;
+                                    });
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _gerarPdf,
-        child: Icon(Icons.picture_as_pdf),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _isLoading ? null : _gerarPdf,
+        icon: const Icon(Icons.picture_as_pdf),
+        label: const Text("Gerar PDF"),
+        backgroundColor: Colors.blueAccent,
+        foregroundColor: Colors.white,
       ),
     );
   }

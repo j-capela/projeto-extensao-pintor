@@ -19,61 +19,66 @@ class HomeScreen extends StatelessWidget {
         centerTitle: true,
         elevation: 2,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center, // Centraliza os botões na tela
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Ícone central para dar uma cara mais amigável ao app
-            Image.asset(
-              'assets/icone.png',
-              height: 500), // Tamanho ajustado para ficar imponente)
-            const SizedBox(height: 10), // Espaçamento
-            
-            // Utilizando o nosso Componente Personalizado
-            _MenuButton(
-              icon: Icons.person_add,
-              label: "Cadastrar Cliente",
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => CadastroClienteScreen()),
+      // Aqui entra o componente que permite a rolagem da tela
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Ícone central
+              Image.asset(
+                'assets/icone.png',
+                height: 250, // Ajustado para manter a proporção com os botões
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 10), 
             
-            _MenuButton(
-              icon: Icons.engineering,
-              label: "Cadastrar Prestador",
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => CadastroPrestadorScreen()),
+              // Botões
+              _MenuButton(
+                icon: Icons.person_add,
+                label: "Cadastrar Cliente",
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CadastroClienteScreen()),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            
-            _MenuButton(
-              icon: Icons.design_services,
-              label: "Cadastrar Serviço",
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => CadastroServicoScreen()),
+              const SizedBox(height: 16),
+              
+              _MenuButton(
+                icon: Icons.engineering,
+                label: "Cadastrar Prestador",
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CadastroPrestadorScreen()),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            
-            _MenuButton(
-              icon: Icons.request_quote,
-              label: "Gerar Orçamento",
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => OrcamentoScreen()),
+              const SizedBox(height: 16),
+              
+              _MenuButton(
+                icon: Icons.design_services,
+                label: "Cadastrar Serviço",
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CadastroServicoScreen()),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+
+              // O botão de Orçamento 
+              _MenuButton(
+                icon: Icons.request_quote,
+                label: "Gerar Orçamento",
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const OrcamentoScreen()),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      ), 
+    ); 
   }
 }
 

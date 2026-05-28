@@ -20,6 +20,7 @@ dependencies:
   printing: ^5.11.0     # Visualizar e imprimir o PDF
   url_launcher: ^6.2.6  # Para abrir o WhatsApp e outras URLs
   cupertino_icons: ^1.0.8
+  intl: ^0.20.2
 
 # ----------------------------------------------------------------------
 # DEPENDÊNCIAS DE DESENVOLVIMENTO (Ferramentas para quem está programando)
