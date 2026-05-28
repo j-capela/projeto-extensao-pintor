@@ -6,8 +6,7 @@ class CadastroPrestadorScreen extends StatefulWidget {
   const CadastroPrestadorScreen({super.key});
 
   @override
-  _CadastroPrestadorScreenState createState() =>
-      _CadastroPrestadorScreenState();
+  _CadastroPrestadorScreenState createState() => _CadastroPrestadorScreenState();
 }
 
 class _CadastroPrestadorScreenState extends State<CadastroPrestadorScreen> {
@@ -18,59 +17,107 @@ class _CadastroPrestadorScreenState extends State<CadastroPrestadorScreen> {
   String? _logotipoPath;
 
   void _salvarPrestador() async {
-    if (_formKey.currentState!.validate()) {
-      final prestador = Prestador(
-        nome: _nomeController.text,
-        telefone: _telefoneController.text,
-        email: _emailController.text,
-        logotipoPath: _logotipoPath ?? '',
-      );
+    // 1. Validação visual do formulário
+    if (!_formKey.currentState!.validate()) {
+      return; 
+    }
 
+    // 2. Monta o objeto Prestador
+    final prestador = Prestador(
+      nome: _nomeController.text,
+      telefone: _telefoneController.text,
+      email: _emailController.text,
+      logotipoPath: _logotipoPath ?? '',
+    );
+
+    // 3. Validação de Regra de Negócio (A nossa defesa)
+    List<String> erros = prestador.validar();
+
+    if (erros.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(erros.first),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return; // Trava o processo aqui se os dados não prestarem
+    }
+
+    // 4. Salvar no banco de dados com segurança
+    try {
       var box = await Hive.openBox<Prestador>('prestadorBox');
+      // Atualiza os dados do dono do app (sobrescreve o antigo)
       await box.put('prestador', prestador);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Dados do prestador salvos com sucesso!")),
-      );
-
-      Navigator.pop(context);
+      // 5. Sucesso! Mostra a mensagem e volta pra Home
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Dados do prestador atualizados com sucesso!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Erro ao acessar o banco de dados: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Cadastro do Prestador")),
+      appBar: AppBar(title: const Text("Perfil do Prestador")),
       body: Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               TextFormField(
                 controller: _nomeController,
-                decoration: InputDecoration(labelText: "Nome"),
-                validator: (value) => value!.isEmpty ? "Informe o nome" : null,
+                decoration: const InputDecoration(labelText: "Nome da Empresa ou Profissional"),
+                validator: (value) {
+                  if (value!.trim().isEmpty) return "Informe o nome";
+                  // RegEx checando visualmente se há números
+                  if (RegExp(r'[0-9]').hasMatch(value)) return "O nome não pode conter números";
+                  return null;
+                },
               ),
               TextFormField(
                 controller: _telefoneController,
-                decoration: InputDecoration(labelText: "Telefone"),
+                decoration: const InputDecoration(labelText: "Telefone de Contato"),
                 keyboardType: TextInputType.phone,
-                validator: (value) =>
-                    value!.isEmpty ? "Informe o telefone" : null,
+                validator: (value) => value!.trim().isEmpty ? "Informe o telefone" : null,
               ),
               TextFormField(
                 controller: _emailController,
-                decoration: InputDecoration(labelText: "E-mail"),
+                decoration: const InputDecoration(labelText: "E-mail (Opcional)"),
                 keyboardType: TextInputType.emailAddress,
-                validator: (value) => value!.isEmpty || !value.contains("@")
-                    ? "E-mail inválido"
-                    : null,
+                // E-mail só fica vermelho se o usuário digitar algo errado, se deixar em branco ele aceita
+                validator: (value) {
+                  if (value!.trim().isNotEmpty && !value.contains("@")) {
+                    return "E-mail inválido";
+                  }
+                  return null;
+                },
               ),
-              SizedBox(height: 20),
-              ElevatedButton(
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
                 onPressed: _salvarPrestador,
-                child: Text("Salvar"),
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text("Salvar Prestador", style: TextStyle(fontSize: 16)),
               ),
             ],
           ),
