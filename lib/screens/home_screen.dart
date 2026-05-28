@@ -10,6 +10,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           "Painel de Gestão - Pintor",
@@ -25,8 +26,10 @@ class HomeScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Ícone central para dar uma cara mais amigável ao app
-            const Icon(Icons.format_paint, size: 80, color: Colors.blueAccent),
-            const SizedBox(height: 40), // Espaçamento
+            Image.asset(
+              'assets/icone.png',
+              height: 500), // Tamanho ajustado para ficar imponente)
+            const SizedBox(height: 10), // Espaçamento
             
             // Utilizando o nosso Componente Personalizado
             _MenuButton(
